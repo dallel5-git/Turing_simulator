@@ -1,0 +1,693 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Machine de Turing — Simulateur</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #0b0f14;
+      --bg2:       #111820;
+      --bg3:       #18222e;
+      --border:    #1e2d3d;
+      --border2:   #2a3f57;
+      --green:     #00e5a0;
+      --green-dim: #007a55;
+      --green-bg:  #00e5a015;
+      --amber:     #f5a623;
+      --amber-bg:  #f5a62315;
+      --red:       #ff5f5f;
+      --red-bg:    #ff5f5f15;
+      --blue:      #5ba3f5;
+      --blue-bg:   #5ba3f515;
+      --text:      #c9d8e8;
+      --text-dim:  #5c7a96;
+      --text-mid:  #8aa3bb;
+      --mono:      'JetBrains Mono', 'Space Mono', monospace;
+    }
+
+    html { font-size: 15px; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--mono);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── SCANLINES overlay ─────────────────────────────── */
+    body::before {
+      content: '';
+      position: fixed; inset: 0; pointer-events: none; z-index: 1000;
+      background: repeating-linear-gradient(
+        0deg, transparent, transparent 2px,
+        rgba(0,0,0,.06) 2px, rgba(0,0,0,.06) 4px
+      );
+    }
+
+    /* ── HEADER ──────────────────────────────────────────── */
+    header {
+      border-bottom: 1px solid var(--border);
+      padding: 1rem 2rem;
+      display: flex;
+      align-items: center;
+      gap: 1.5rem;
+      background: var(--bg2);
+    }
+    .logo-badge {
+      width: 36px; height: 36px;
+      border: 1.5px solid var(--green);
+      border-radius: 6px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 16px; color: var(--green); font-weight: 700;
+      box-shadow: 0 0 12px var(--green-dim);
+      flex-shrink: 0;
+    }
+    header h1 { font-size: 1rem; font-weight: 400; color: var(--text-mid); letter-spacing: .12em; text-transform: uppercase; }
+    header h1 span { color: var(--green); font-weight: 700; }
+    .header-right {
+      margin-left: auto;
+      display: flex; gap: .5rem; align-items: center;
+    }
+    .dot { width: 8px; height: 8px; border-radius: 50%; }
+    .dot.r { background: #ff5f57; }
+    .dot.y { background: #febc2e; }
+    .dot.g { background: #28c840; }
+
+    /* ── MAIN LAYOUT ───────────────────────────────────── */
+    main {
+      display: grid;
+      grid-template-columns: 1fr 340px;
+      grid-template-rows: auto;
+      gap: 0;
+      flex: 1;
+    }
+
+    .panel-left {
+      border-right: 1px solid var(--border);
+      display: flex; flex-direction: column;
+      padding: 1.5rem 2rem;
+      gap: 1.5rem;
+    }
+    .panel-right {
+      padding: 1.5rem;
+      display: flex; flex-direction: column;
+      gap: 1.25rem;
+    }
+
+    /* ── SECTION LABELS ──────────────────────────────── */
+    .sec-label {
+      font-size: .7rem;
+      letter-spacing: .18em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      margin-bottom: .5rem;
+    }
+
+    /* ── TAPE ────────────────────────────────────────── */
+    .tape-section { }
+    .tape-wrap {
+      overflow: hidden;
+      position: relative;
+    }
+    #tape-row {
+      display: flex;
+      justify-content: center;
+    }
+    .cell {
+      width: 52px; min-width: 52px; height: 60px;
+      border: 1px solid var(--border2);
+      border-right: none;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      gap: 3px;
+      transition: background .12s, border-color .12s;
+      position: relative;
+    }
+    .cell:last-child { border-right: 1px solid var(--border2); }
+    .cell:first-child { border-radius: 4px 0 0 4px; }
+    .cell:last-child  { border-radius: 0 4px 4px 0; }
+    .cell.hd {
+      background: var(--green-bg);
+      border-color: var(--green-dim);
+      border-right: 1px solid var(--green-dim);
+    }
+    .cell.hd + .cell { border-left: none; }
+    .cell-sym {
+      font-size: 1.4rem; font-weight: 700;
+      color: var(--text);
+      line-height: 1;
+    }
+    .cell.hd .cell-sym { color: var(--green); }
+    .cell-idx {
+      font-size: .6rem; color: var(--text-dim);
+      line-height: 1;
+    }
+    .cell.hd .cell-idx { color: var(--green-dim); }
+    .head-pointer {
+      text-align: center; margin-top: .4rem;
+      font-size: .7rem; color: var(--green);
+      letter-spacing: .1em;
+    }
+    .head-pointer::before { content: '▲  '; }
+
+    /* ── STATS ──────────────────────────────────────── */
+    .stats { display: flex; gap: .75rem; flex-wrap: wrap; }
+    .stat-box {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: .6rem 1rem;
+      flex: 1; min-width: 90px;
+    }
+    .stat-box .label { font-size: .65rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: .12em; }
+    .stat-box .val { font-size: 1.4rem; font-weight: 700; color: var(--text); margin-top: 2px; }
+    #badge {
+      align-self: center;
+      font-size: .75rem; padding: 4px 14px;
+      border-radius: 20px;
+      border: 1px solid var(--border2);
+      background: var(--bg2);
+      color: var(--text-dim);
+      letter-spacing: .06em;
+      transition: all .2s;
+    }
+    #badge.accept { background: var(--green-bg); border-color: var(--green-dim); color: var(--green); }
+    #badge.reject { background: var(--red-bg);   border-color: var(--red);      color: var(--red);   }
+    #badge.running{ background: var(--amber-bg); border-color: var(--amber);    color: var(--amber); }
+
+    /* ── CONTROLS ──────────────────────────────────── */
+    .controls { display: flex; gap: .5rem; flex-wrap: wrap; align-items: center; }
+    button {
+      font-family: var(--mono);
+      font-size: .78rem;
+      padding: 6px 14px;
+      border-radius: 5px;
+      border: 1px solid var(--border2);
+      background: var(--bg2);
+      color: var(--text-mid);
+      cursor: pointer;
+      letter-spacing: .06em;
+      transition: all .15s;
+      white-space: nowrap;
+    }
+    button:hover { border-color: var(--green-dim); color: var(--green); background: var(--green-bg); }
+    button.primary { border-color: var(--green-dim); color: var(--green); }
+    button:disabled { opacity: .35; cursor: not-allowed; }
+    .speed-wrap {
+      display: flex; align-items: center; gap: .5rem;
+      font-size: .75rem; color: var(--text-dim);
+      margin-left: .5rem;
+    }
+    input[type=range] {
+      -webkit-appearance: none; appearance: none;
+      width: 90px; height: 4px;
+      background: var(--border2); border-radius: 2px;
+      outline: none; cursor: pointer;
+    }
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 14px; height: 14px;
+      border-radius: 50%;
+      background: var(--green);
+      border: none;
+    }
+
+    /* ── LOG ─────────────────────────────────────── */
+    #log {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: .6rem .8rem;
+      font-size: .72rem;
+      color: var(--text-dim);
+      height: 72px;
+      overflow-y: auto;
+      line-height: 1.7;
+    }
+    #log .line { }
+    #log .line.info { color: var(--green-dim); }
+    #log .line.err  { color: var(--red); }
+    #log .line.ok   { color: var(--green); }
+    #log::-webkit-scrollbar { width: 4px; }
+    #log::-webkit-scrollbar-track { background: transparent; }
+    #log::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+    /* ── TAPE INPUT ──────────────────────────────── */
+    .tape-input-row { display: flex; gap: .5rem; align-items: center; }
+    input[type=text] {
+      font-family: var(--mono);
+      font-size: .85rem;
+      background: var(--bg);
+      border: 1px solid var(--border2);
+      border-radius: 5px;
+      color: var(--text);
+      padding: 5px 10px;
+      outline: none;
+      width: 100%;
+      transition: border-color .15s;
+    }
+    input[type=text]:focus { border-color: var(--green-dim); }
+
+    /* ── EXAMPLES ────────────────────────────────── */
+    select {
+      font-family: var(--mono);
+      font-size: .78rem;
+      background: var(--bg2);
+      border: 1px solid var(--border2);
+      border-radius: 5px;
+      color: var(--text-mid);
+      padding: 5px 10px;
+      cursor: pointer;
+      outline: none;
+    }
+    select:focus { border-color: var(--green-dim); }
+    option { background: var(--bg2); }
+
+    /* ── RIGHT PANEL: TRANSITION TABLE ────────────── */
+    .panel-right h2 {
+      font-size: .7rem;
+      letter-spacing: .18em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      border-bottom: 1px solid var(--border);
+      padding-bottom: .5rem;
+    }
+    #ttable {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: .75rem;
+    }
+    #ttable thead th {
+      text-align: center;
+      color: var(--text-dim);
+      font-weight: 400;
+      font-size: .65rem;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+      padding: 4px 4px 6px;
+      border-bottom: 1px solid var(--border);
+    }
+    #ttable tbody tr {
+      transition: background .1s;
+    }
+    #ttable tbody tr:hover { background: var(--bg2); }
+    #ttable tbody tr.active-rule { background: var(--green-bg); }
+    #ttable tbody tr.active-rule td input { color: var(--green); }
+    #ttable td { padding: 2px 2px; }
+    #ttable td input {
+      width: 100%;
+      font-family: var(--mono);
+      font-size: .78rem;
+      background: transparent;
+      border: 1px solid transparent;
+      border-radius: 4px;
+      color: var(--text);
+      padding: 4px 5px;
+      text-align: center;
+      outline: none;
+    }
+    #ttable td input:focus {
+      border-color: var(--border2);
+      background: var(--bg);
+    }
+    #ttable td.del-col { width: 24px; }
+    #ttable td.del-col button {
+      padding: 2px 5px; font-size: .65rem;
+      border-color: transparent; background: transparent;
+      color: var(--text-dim);
+    }
+    #ttable td.del-col button:hover { color: var(--red); border-color: var(--red); background: var(--red-bg); }
+    .add-rule-btn { width: 100%; margin-top: .5rem; font-size: .75rem; }
+
+    .hint {
+      font-size: .65rem;
+      color: var(--text-dim);
+      line-height: 1.6;
+      border-top: 1px solid var(--border);
+      padding-top: .75rem;
+      margin-top: auto;
+    }
+    .hint code { color: var(--text-mid); }
+
+    /* ── RESPONSIVE ──────────────────────────────── */
+    @media (max-width: 860px) {
+      main { grid-template-columns: 1fr; }
+      .panel-left { padding: 1rem; }
+      .panel-right { border-top: 1px solid var(--border); }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo-badge">TM</div>
+  <h1><span>Machine de Turing</span> — Simulateur interactif </h1> Réalisé par Oussama Dallel<a href="https://www.linkedin.com/in/oussama-dallel-120143209/" style="color: var(--green); text-decoration: none;" target="_blank">Linkedin</a>
+  <div class="header-right">
+    <div class="dot r"></div>
+    <div class="dot y"></div>
+    <div class="dot g"></div>
+  </div>
+</header>
+
+<main>
+  <!-- ═══ LEFT PANEL ═══════════════════════════════ -->
+  <section class="panel-left">
+
+    <!-- Examples + tape input -->
+    <div>
+      <div class="sec-label">Charger un exemple</div>
+      <div style="display:flex;gap:.5rem;flex-wrap:wrap;">
+        <select id="ex" onchange="loadEx()">
+          <option value="">— choisir un exemple —</option>
+          <option value="inc">Incrémentation binaire</option>
+          <option value="even">Parité du nombre de 1</option>
+          <option value="add">Addition unaire</option>
+          <option value="copy">Copie d'un mot</option>
+        </select>
+      </div>
+      <div style="margin-top:.75rem;" class="sec-label">Ruban initial</div>
+      <div class="tape-input-row">
+        <input type="text" id="tinput" placeholder="ex: 1011 ou 111+11" />
+        <button onclick="loadTape()">Charger ↺</button>
+      </div>
+    </div>
+
+    <!-- Tape -->
+    <div class="tape-section">
+      <div class="sec-label">Ruban (tape)</div>
+      <div class="tape-wrap">
+        <div id="tape-row"></div>
+      </div>
+      <div class="head-pointer" id="head-label">tête de lecture/écriture · position <span id="hpos">0</span></div>
+    </div>
+
+    <!-- Stats -->
+    <div>
+      <div class="sec-label">État courant</div>
+      <div class="stats">
+        <div class="stat-box">
+          <div class="label">état</div>
+          <div class="val" id="cstate">q0</div>
+        </div>
+        <div class="stat-box">
+          <div class="label">étapes</div>
+          <div class="val" id="nsteps">0</div>
+        </div>
+        <div class="stat-box">
+          <div class="label">position</div>
+          <div class="val" id="hpos2">0</div>
+        </div>
+        <div id="badge">idle</div>
+      </div>
+    </div>
+
+    <!-- Controls -->
+    <div>
+      <div class="sec-label">Contrôles</div>
+      <div class="controls">
+        <button class="primary" onclick="doStep()">Pas → </button>
+        <button onclick="doRun()">Exécuter ▶</button>
+        <button onclick="doPause()">Pause ⏸</button>
+        <button onclick="doReset()">Réinitialiser ↺</button>
+        <div class="speed-wrap">
+          Vitesse
+          <input type="range" min="1" max="5" value="3" id="spd"
+            oninput="document.getElementById('spdo').textContent=this.value" />
+          <span id="spdo">3</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Log -->
+    <div>
+      <div class="sec-label" style="display:flex;justify-content:space-between;">
+        Journal d'exécution
+        <span style="cursor:pointer;color:var(--text-dim);" onclick="clearLog()">effacer</span>
+      </div>
+      <div id="log"></div>
+    </div>
+
+  </section>
+
+  <!-- ═══ RIGHT PANEL ═══════════════════════════════ -->
+  <aside class="panel-right">
+    <h2>Table de transitions</h2>
+
+    <table id="ttable">
+      <thead>
+        <tr>
+          <th>État</th>
+          <th>Lire</th>
+          <th>Écrire</th>
+          <th>Mouv.</th>
+          <th>Suivant</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="tbody"></tbody>
+    </table>
+
+    <button class="add-rule-btn" onclick="addRow()">+ Ajouter une règle</button>
+
+    <div class="hint">
+      <strong style="color:var(--text-mid);">Format des règles</strong><br />
+      <code>Mouvement</code> : <code>L</code> (gauche) · <code>R</code> (droite) · <code>N</code> (immobile)<br />
+      <code>Symbole vide</code> : <code>_</code><br />
+      <code>États terminaux</code> : <code>halt</code>, <code>accept</code>, <code>reject</code><br /><br />
+      Les règles s'appliquent à la paire <em>(état courant, symbole lu)</em>.
+      La première règle correspondante est utilisée.
+    </div>
+  </aside>
+</main>
+
+
+<script>
+const BLANK = '_', WIN = 13;
+const HALTS   = new Set(['halt','accept','reject','qaccept','qreject','HALT','ACCEPT','REJECT','h']);
+const ACCEPTS  = new Set(['accept','qaccept','ACCEPT']);
+
+const EX = {
+  inc: {
+    tape: '1011', state: 'q0',
+    desc: 'Incrémente un nombre binaire de 1. (1011 → 1100)',
+    rules: [
+      ['q0','0','0','R','q0'],
+      ['q0','1','1','R','q0'],
+      ['q0','_','_','L','q1'],
+      ['q1','1','0','L','q1'],
+      ['q1','0','1','N','halt'],
+      ['q1','_','1','N','halt'],
+    ]
+  },
+  even: {
+    tape: '110110', state: 'q0',
+    desc: 'Accepte si le nombre de 1 est pair, rejette sinon.',
+    rules: [
+      ['q0','0','0','R','q0'],
+      ['q0','1','1','R','q1'],
+      ['q0','_','_','N','accept'],
+      ['q1','0','0','R','q1'],
+      ['q1','1','1','R','q0'],
+      ['q1','_','_','N','reject'],
+    ]
+  },
+  add: {
+    tape: '111+11', state: 'q0',
+    desc: 'Addition unaire : remplace + par 1 et efface le dernier 1. (111+11 → 11111)',
+    rules: [
+      ['q0','1','1','R','q0'],
+      ['q0','+','1','R','q1'],
+      ['q1','1','1','R','q1'],
+      ['q1','_','_','L','q2'],
+      ['q2','1','_','N','halt'],
+    ]
+  },
+  copy: {
+    tape: '1110', state: 'q0',
+    desc: 'Copie un bloc de 1 après un 0 séparateur. (1110 → 1110111)',
+    rules: [
+      ['q0','1','X','R','q1'],
+      ['q0','0','0','R','q3'],
+      ['q0','_','_','N','halt'],
+      ['q1','1','1','R','q1'],
+      ['q1','0','0','R','q1'],
+      ['q1','_','1','L','q2'],
+      ['q2','1','1','L','q2'],
+      ['q2','0','0','L','q2'],
+      ['q2','X','1','R','q0'],
+      ['q3','1','1','R','q3'],
+      ['q3','_','_','N','halt'],
+    ]
+  }
+};
+
+let tape = {}, head = 0, curState = 'q0', steps = 0, halted = false, timer = null;
+let initTape = '', initState = 'q0';
+
+function rd(p) { return tape[p] || BLANK; }
+function wr(p, s) { if (s === BLANK) delete tape[p]; else tape[p] = s; }
+
+function getRules() {
+  return Array.from(document.querySelectorAll('#tbody tr')).map(r => {
+    const inp = r.querySelectorAll('input');
+    return {
+      state: inp[0].value.trim(),
+      read:  inp[1].value.trim() || BLANK,
+      write: inp[2].value.trim() || BLANK,
+      move:  (inp[3].value.trim() || 'N').toUpperCase(),
+      next:  inp[4].value.trim()
+    };
+  }).filter(r => r.state && r.next);
+}
+
+function findRule(st, sym) {
+  return getRules().findIndex(r => r.state === st && r.read === sym);
+}
+
+function doStep() {
+  if (halted) return;
+  const sym = rd(head);
+  const idx = findRule(curState, sym);
+  document.querySelectorAll('#tbody tr').forEach((r, i) => r.classList.toggle('active-rule', i === idx));
+  if (idx === -1) {
+    halted = true;
+    setBadge('reject');
+    log(`Aucune règle pour (${curState}, "${sym}") — machine bloquée (reject)`, 'err');
+    render(); return;
+  }
+  const rules = getRules(), rule = rules[idx], prev = curState;
+  wr(head, rule.write);
+  curState = rule.next;
+  if (rule.move === 'L') head--;
+  else if (rule.move === 'R') head++;
+  steps++;
+  log(`(${prev}, ${sym}) → écrire "${rule.write}", move ${rule.move} → ${curState}`, 'info');
+  if (HALTS.has(curState)) {
+    halted = true;
+    const ok = ACCEPTS.has(curState);
+    setBadge(ok ? 'accept' : 'reject');
+    log(`Halte dans l'état "${curState}" — ${ok ? 'ACCEPTÉ' : 'REJETÉ'}`, ok ? 'ok' : 'err');
+  }
+  render();
+}
+
+function doRun() {
+  if (halted || timer) return;
+  setBadge('running');
+  const spds = [600, 280, 120, 50, 15];
+  const ms = spds[parseInt(document.getElementById('spd').value) - 1];
+  timer = setInterval(() => { doStep(); if (halted) doPause(); }, ms);
+}
+
+function doPause() {
+  if (timer) { clearInterval(timer); timer = null; }
+  if (!halted) setBadge('idle');
+}
+
+function doReset() {
+  doPause();
+  tape = {}; head = 0; curState = initState; steps = 0; halted = false;
+  for (let i = 0; i < initTape.length; i++) if (initTape[i] !== BLANK) tape[i] = initTape[i];
+  document.querySelectorAll('#tbody tr').forEach(r => r.classList.remove('active-rule'));
+  setBadge('idle');
+  log('— Réinitialisation —', 'info');
+  render();
+}
+
+function loadTape() {
+  const raw = document.getElementById('tinput').value || '';
+  initTape = raw;
+  tape = {}; head = 0; steps = 0; halted = false;
+  for (let i = 0; i < raw.length; i++) if (raw[i] !== BLANK) tape[i] = raw[i];
+  doPause(); setBadge('idle');
+  log(`Ruban chargé : "${raw || '(vide)'}"`, 'info');
+  render();
+}
+
+function loadEx() {
+  const v = document.getElementById('ex').value;
+  if (!v) return;
+  applyEx(v);
+}
+
+function applyEx(key) {
+  const ex = EX[key]; if (!ex) return;
+  initTape = ex.tape; initState = ex.state;
+  document.getElementById('tinput').value = ex.tape;
+  tape = {}; head = 0; curState = ex.state; steps = 0; halted = false;
+  for (let i = 0; i < ex.tape.length; i++) if (ex.tape[i] !== BLANK) tape[i] = ex.tape[i];
+  doPause(); setRules(ex.rules); setBadge('idle');
+  document.getElementById('log').innerHTML = '';
+  log(ex.desc, 'ok');
+  render();
+}
+
+function setRules(rows) {
+  const tb = document.getElementById('tbody'); tb.innerHTML = '';
+  rows.forEach(r => addRow(r));
+}
+
+function addRow(vals) {
+  const tb = document.getElementById('tbody');
+  const tr = document.createElement('tr');
+  const f = vals || ['', '_', '_', 'R', ''];
+  const ph = ['q0', '_', '_', 'R', 'q1'];
+  tr.innerHTML = f.map((v, i) =>
+    `<td><input value="${v}" placeholder="${ph[i]}" /></td>`
+  ).join('') + `<td class="del-col"><button onclick="this.closest('tr').remove()">✕</button></td>`;
+  tb.appendChild(tr);
+}
+
+function render() {
+  const row = document.getElementById('tape-row');
+  const half = Math.floor(WIN / 2); let h = '';
+  for (let i = head - half; i <= head + half; i++) {
+    const sym = rd(i), isH = (i === head);
+    h += `<div class="cell${isH ? ' hd' : ''}">
+      <span class="cell-sym">${sym}</span>
+      <span class="cell-idx">${i}</span>
+    </div>`;
+  }
+  row.innerHTML = h;
+  document.getElementById('cstate').textContent = curState;
+  document.getElementById('nsteps').textContent = steps;
+  document.getElementById('hpos').textContent = head;
+  document.getElementById('hpos2').textContent = head;
+}
+
+function setBadge(s) {
+  const b = document.getElementById('badge');
+  const m = {
+    idle:    ['idle',     ''],
+    running: ['en cours ●', 'running'],
+    accept:  ['accepté ✓', 'accept'],
+    reject:  ['rejeté ✗',  'reject'],
+  };
+  const [txt, cls] = m[s] || m.idle;
+  b.textContent = txt;
+  b.className = cls;
+}
+
+function log(msg, type = '') {
+  const l = document.getElementById('log');
+  const d = document.createElement('div');
+  d.className = 'line' + (type ? ' ' + type : '');
+  d.textContent = '> ' + msg;
+  l.appendChild(d);
+  l.scrollTop = l.scrollHeight;
+}
+function clearLog() { document.getElementById('log').innerHTML = ''; }
+
+// Init
+document.getElementById('ex').value = 'inc';
+applyEx('inc');
+</script>
+</body>
+
+</html>
