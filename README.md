@@ -2,6 +2,8 @@
 
 Un simulateur interactif, léger et visuel pour apprendre le fonctionnement théorique des machines de Turing. 
 
+<img width="1350" height="584" alt="image" src="https://github.com/user-attachments/assets/7ca4b68f-bdfa-41e6-bfce-26464df36041" />
+
 ## 🚀 Accès rapide
 Vous pouvez tester le simulateur directement ici : **[Lien vers votre page GitHub Pages]**
 
@@ -18,4 +20,4 @@ Vous pouvez tester le simulateur directement ici : **[Lien vers votre page GitHu
 
 ## Licence
 Ce projet est open-source sous licence [MIT](LICENSE).
-<img width="1350" height="584" alt="image" src="https://github.com/user-attachments/assets/7ca4b68f-bdfa-41e6-bfce-26464df36041" />
+
