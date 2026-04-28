@@ -4,7 +4,8 @@ Un simulateur interactif, léger et visuel pour apprendre le fonctionnement thé
 
 
 
-<img width="1353" height="576" alt="Capture d’écran du 2026-04-28 15-09-14" src="https://github.com/user-attachments/assets/04c22ee5-7a63-4929-8454-e287711ac803" />
+<img width="1353" height="576" alt="Capture d’écran du 2026-04-28 15-09-09" src="https://github.com/user-attachments/assets/534f13a3-4ceb-4a2f-8964-de9ee6f5c070" />
+
 
 <img width="1353" height="576" alt="image" src="https://github.com/user-attachments/assets/4a2a6e80-a3c4-4a72-82a6-6b16ebf1897d" />
 
