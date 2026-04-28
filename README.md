@@ -2,11 +2,11 @@
 
 Un simulateur interactif, léger et visuel pour apprendre le fonctionnement théorique des machines de Turing. 
 
-<img width="1353" height="576" alt="Capture d’écran du 2026-04-28 15-01-44" src="https://github.com/user-attachments/assets/d2ef54b6-5b96-406b-9ab9-02c49833d9b3" />
 
 
+<img width="1353" height="576" alt="Capture d’écran du 2026-04-28 15-09-14" src="https://github.com/user-attachments/assets/04c22ee5-7a63-4929-8454-e287711ac803" />
 
-<img width="1353" height="576" alt="Capture d’écran du 2026-04-28 15-01-58" src="https://github.com/user-attachments/assets/e94b8642-22e6-4622-bba9-fe427c3b5e36" />
+<img width="1353" height="576" alt="image" src="https://github.com/user-attachments/assets/4a2a6e80-a3c4-4a72-82a6-6b16ebf1897d" />
 
 
 
